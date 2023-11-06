@@ -14,10 +14,8 @@ rewards[goal] = 1
 gamma = 0.95
 alpha = 0.1
 epsilon = 0.1
-n = 10
+n = 5
 
-# Helper
-rng = np.random.default_rng()
 
 # Actions
 '''
@@ -27,6 +25,11 @@ rng = np.random.default_rng()
 3: left
 '''
 actions = [0,1,2,3]
+
+# Helpers
+rng = np.random.default_rng()
+observedStates = []
+observedStateActions = np.zeros((grid.size, len(actions)))
 
 # Q-Table
 # States x Actions
@@ -70,18 +73,21 @@ def take_action(S, A):
     return R, nextState
 
 # DynaQ Algorithm
-currentState = start
-observedStates = []
+currentState = np.ravel_multi_index(start, grid.shape)
 
 while True:
-    S = np.ravel_multi_index(currentState, grid.shape)
+    S = currentState
     A = epsilon_greedy(S)
+    observedStateActions[S, A] = 1
+    observedStates.append(S)
 
     # Take action A; observe resultant reward, R and state, S'
     R, nextState = take_action(S, A)
-    print(f'A: {A}')
+    print('\n')
+    print(f'currentState: {S}')
+    print(f'Action: {A}')
     print(f'nextState: {nextState}')
-    print(f'R: {R}')
+    print(f'Reward: {R}')
 
     # Update Q-Table
     max = np.argwhere(Q[nextState] == np.amax(Q[nextState]))
@@ -92,6 +98,15 @@ while True:
     Model[S, A] = (R, nextState)
 
     for i in range(n):
-        pass
-
-    break
+        print(f'    Planning Phase')
+        S = rng.choice(observedStates)
+        max = np.argwhere(observedStateActions[S] == np.amax(observedStateActions[S]))
+        A = rng.choice(max)[0]
+        R, nextState = Model[S, A]
+        print(f'      S: {S}')
+        print(f'      A: {A}')
+        print(f'      R: {R}')
+        max = np.argwhere(Q[nextState] == np.amax(Q[nextState]))
+        greedyAction = rng.choice(max)[0]
+        Q[S, A] = Q[S, A] + alpha * (R + gamma * Q[nextState, greedyAction] - Q[S, A])
+    currentState = nextState
