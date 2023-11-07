@@ -1,7 +1,9 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Setup Grid
 grid = np.ones((6, 9))
+print(grid)
 grid[1:4, 2] = 0
 grid[0:3, 7] = 0
 grid[4, 5] = 0
@@ -14,8 +16,10 @@ rewards[goal] = 1
 gamma = 0.95
 alpha = 0.1
 epsilon = 0.1
-n = 50
-
+n = [0,5,50]
+numSteps = 0
+numEpisodes = 50
+stepsPerEpisode = []
 
 # Actions
 '''
@@ -27,9 +31,10 @@ n = 50
 actions = [0,1,2,3]
 
 # Helpers
-rng = np.random.default_rng()
+rng = np.random.default_rng(seed=42)
 observedStates = []
 observedStateActions = np.zeros((grid.size, len(actions)))
+
 
 # Q-Table
 # States x Actions
@@ -41,10 +46,9 @@ Model = np.zeros((grid.size, len(actions)), dtype=object)
 
 # Epsilon-Greedy Policy
 def epsilon_greedy(S):
-    # rng = np.random.default_rng()
     p = rng.random()
     action = 0
-    if p < epsilon: # Random Choice
+    if p <= epsilon: # Random Choice
         action = rng.choice(actions)
     else: # Max of Q[S] Choice
         max = np.argwhere(Q[S] == np.amax(Q[S]))
@@ -90,7 +94,7 @@ def not_out_of_grid(S, A):
 def take_action(S, A):
     nextState = 0
     R = 0
-    # NEED TO CHECK IF EDGE AND SKIP IF SO!!!!
+
     if not_out_of_grid(S,A):
 
         if A == 0:  # Up
@@ -117,50 +121,66 @@ def take_action(S, A):
 
     return R, nextState
 
-# DynaQ Algorithm
-currentState = np.ravel_multi_index(start, grid.shape)
 
-while True:
-    if currentState == np.ravel_multi_index(goal, grid.shape):
-        break
-    else:
-        S = currentState
-        A = epsilon_greedy(S)
-        observedStateActions[S, A] = 1
-        if not S in observedStates:
-            observedStates.append(S)
+for episode in range(numEpisodes):
+    # DynaQ Algorithm
+    currentState = np.ravel_multi_index(start, grid.shape)
+    numSteps = 0
+    while True:
+        if currentState == np.ravel_multi_index(goal, grid.shape):
+            print('Reached Terminal State')
+            break
+        else:
+            S = currentState
+            A = epsilon_greedy(S)
+            observedStateActions[S, A] = 1
+            if not S in observedStates:
+                observedStates.append(S)
 
-        # Take action A; observe resultant reward, R and state, S'
-        R, nextState = take_action(S, A)
-        print('\n')
-        print(f'currentState: {S}')
-        print(f'Action: {A}')
-        print(f'nextState: {nextState}')
-        print(f'Reward: {R}')
+            # Take action A; observe resultant reward, R and state, S'
+            R, nextState = take_action(S, A)
+            print('\n')
+            print(f'currentState: {S}')
+            print(f'Action: {A}')
+            print(f'nextState: {nextState}')
+            print(f'Reward: {R}')
 
-        # Update Q-Table
-        max = np.argwhere(Q[nextState] == np.amax(Q[nextState]))
-        greedyAction = rng.choice(max)[0]
-        Q[S, A] = Q[S, A] + alpha*(R + gamma*Q[nextState, greedyAction] - Q[S, A])
-
-        # Update Model (assuming deterministic environment)
-        Model[S, A] = (R, nextState)
-        print(f'Q[S,A]: {Q[S,A]}')
-        for i in range(n):
-            print(f'    Planning Phase')
-            print(f'      observedStates: {observedStates}')
-            S = rng.choice(observedStates)
-            max = np.argwhere(observedStateActions[S] == np.amax(observedStateActions[S]))
-            A = rng.choice(max)[0]
-            R, nextState = Model[S, A]
-            print(f'      S: {S}')
-            print(f'      A: {A}')
-            print(f'      nextState: {nextState}')
-            print(f'      R: {R}')
+            # Update Q-Table
             max = np.argwhere(Q[nextState] == np.amax(Q[nextState]))
             greedyAction = rng.choice(max)[0]
-            Q[S, A] = Q[S, A] + alpha * (R + gamma * Q[nextState, greedyAction] - Q[S, A])
-            print(f'      Q[S,A]: {Q[S,A]}')
-        currentState = nextState
+            Q[S, A] = Q[S, A] + alpha*(R + gamma*Q[nextState, greedyAction] - Q[S, A])
+
+            # Update Model (assuming deterministic environment)
+            Model[S, A] = (R, nextState)
+
+            # Planning Phase
+            print(f'Q[S,A]: {Q[S,A]}')
+            for i in range(n):
+                print(f'    Planning Phase')
+                print(f'      observedStates: {observedStates}')
+                S = rng.choice(observedStates)
+                observedActions = np.argwhere(observedStateActions[S] == np.amax(observedStateActions[S]))
+                A = rng.choice(observedActions)[0]
+                R, nextStatePlanning = Model[S, A]
+                print(f'      S: {S}')
+                print(f'      A: {A}')
+                print(f'      nextState: {nextStatePlanning}')
+                print(f'      R: {R}')
+
+                # Update Q-Table
+                greedyActions = np.argwhere(Q[nextStatePlanning] == np.amax(Q[nextStatePlanning]))
+                greedyAction = rng.choice(greedyActions)[0]
+                Q[S, A] = Q[S, A] + alpha * (R + gamma * Q[nextStatePlanning, greedyAction] - Q[S, A])
+                print(f'      Q[S,A]: {Q[S,A]}')
+
+            currentState = nextState
+            numSteps += 1
+
+    stepsPerEpisode.append(numSteps)
 
 print(f'Q: {Q}')
+print(f'numSteps: {numSteps}')
+print(f'steps per episode: {stepsPerEpisode}')
+
+plt.plot(range(numEpisodes), stepsPerEpisode)
+plt.show()
